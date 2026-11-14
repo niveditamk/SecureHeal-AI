@@ -1,0 +1,101 @@
+services:
+  # --- PostgreSQL Database ---
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: secureheal
+      POSTGRES_PASSWORD: secureheal
+      POSTGRES_DB: secureheal
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U secureheal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- SecureHeal-AI Backend API ---
+  secureheal-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://secureheal:secureheal@postgres:5432/secureheal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./secureheal:/app/secureheal
+      - ./target_services:/app/target_services
+      - ./vulnerability_cases:/app/vulnerability_cases
+
+  # --- Streamlit Dashboard ---
+  streamlit-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["streamlit", "run", "secureheal/dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://secureheal:secureheal@postgres:5432/secureheal
+      SECUREHEAL_API_URL: http://secureheal-backend:8000
+    depends_on:
+      secureheal-backend:
+        condition: service_healthy
+    volumes:
+      - ./secureheal:/app/secureheal
+
+  # --- OWASP ZAP (API Security Scanner) ---
+  zap:
+    image: zaproxy/zap-stable:latest
+    command: ["zap.sh", "-daemon", "-host", "0.0.0.0", "-port", "8080",
+              "-config", "api.addrs.addr.name=.*", "-config", "api.addrs.addr.regex=true",
+              "-config", "api.disablekey=true"]
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/JSON/core/view/version/"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # --- Vulnerable Python Target Service ---
+  target-python:
+    build:
+      context: ./target_services/python_fastapi
+    ports:
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:9001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # --- Vulnerable Java Target Service ---
+  target-java:
+    build:
+      context: ./target_services/java_spring_boot
+    ports:
+      - "9002:9002"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9002/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  pgdata:

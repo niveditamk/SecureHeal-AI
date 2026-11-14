@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "secureheal-ai"
+version = "0.1.0"
+description = "An Attack-Context-Aware Multi-Agent Framework for Causal Root-Cause Analysis, Security-Constrained Automated Program Repair and Human-Verified Self-Healing of Cloud-Native Applications and APIs"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "SecureHeal-AI Research" }]
+
+dependencies = [
+    "langgraph>=0.4",
+    "langchain>=0.3",
+    "langchain-openai>=0.3",
+    "langchain-google-genai>=2.1",
+    "fastapi>=0.115",
+    "uvicorn[standard]",
+    "sqlalchemy>=2.0",
+    "asyncpg",
+    "psycopg2-binary",
+    "chromadb>=0.5",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
+    "pydantic>=2.0",
+    "pydantic-settings",
+    "httpx",
+    "gitpython",
+    "tree-sitter",
+    "streamlit>=1.40",
+    "plotly",
+    "python-dotenv",
+    "aiosqlite",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["secureheal"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
